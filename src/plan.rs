@@ -196,8 +196,14 @@ where
     for i in 0..plan.positive_indices.len() {
         let desired_field = plan.positive_indices[i];
 
+        let offset = if desired_field >= seen {
+            desired_field - seen
+        } else {
+            0
+        };
+
         let f_start = delim_iterator
-            .nth(desired_field - seen)
+            .nth(offset)
             .ok_or_else(|| {
                 plan.positive_fields[desired_field..].fill(Range {
                     start: Side::max_right(),
@@ -248,8 +254,14 @@ where
         // negative_indices is sorted from biggest (-1) to smallest (-X)
         let desired_field = plan.negative_indices[i];
 
+        let offset = if desired_field >= seen {
+            desired_field - seen
+        } else {
+            0
+        };
+
         let f_end = delim_iterator
-            .nth(desired_field - seen)
+            .nth(offset)
             .ok_or_else(|| {
                 plan.negative_fields[desired_field..].fill(Range {
                     start: Side::max_right(),
@@ -311,14 +323,16 @@ where
 
     let mut out_of_bound_pos_idx = None;
     // Do we have any positive out of bounds?
-    if plan.positive_indices.last() > Some(&(num_fields - 1)) {
-        // need to find out which one is the first index out of bound
-        out_of_bound_pos_idx = Some(
-            plan.positive_indices
-                .binary_search(&(num_fields))
-                .unwrap_or_else(|idx| idx)
-                + 1, // wouldn't work for empty positive indices but here's ok
-        );
+    if let Some(&last_idx) = plan.positive_indices.last() {
+        if num_fields == 0 || last_idx >= num_fields {
+            // need to find out which one is the first index out of bound
+            out_of_bound_pos_idx = Some(
+                plan.positive_indices
+                    .binary_search(&num_fields)
+                    .unwrap_or_else(|idx| idx)
+                    + 1, // wouldn't work for empty positive indices but here's ok
+            );
+        }
     }
 
     let mut out_of_bound_neg_idx = None;

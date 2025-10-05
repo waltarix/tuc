@@ -1,149 +1,52 @@
 name: Release
 
-defaults:
-  run:
-    shell: bash
-
 on:
   push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+-custom
+      - v[0-9]+.[0-9]+.[0-9]+-custom-r[0-9]+
 
 jobs:
-  check_if_safe:
-    name: Check if safe to release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy, rustfmt
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets --all-features -- -D warnings
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features --features regex
-
-  release:
-    needs: check_if_safe
-    name: Build and Release
-    runs-on: ${{ matrix.partial_os }}-latest
+  build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        release_type: [full, lite]
-        partial_os: [ubuntu, macos, windows]
-        ext: ['', '.exe']
-        exclude:
-          - partial_os: windows
-            ext: ''
-          - partial_os: ubuntu
-            ext: '.exe'
-          - partial_os: macos
-            ext: '.exe'
+        include:
+          - os: ubuntu-24.04
+            rust-target: x86_64-unknown-linux-musl
+          - os: macos-15
+            rust-target: x86_64-apple-darwin
+          - os: macos-15
+            rust-target: aarch64-apple-darwin
+    env:
+      xcode_version: "26.0"
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Build tuc (full)
-        if: matrix.release_type == 'full'
-        run: cargo build --release --locked
+      - name: Set RUST_TARGET
+        run: echo 'RUST_TARGET=${{ matrix.rust-target }}' >> $GITHUB_ENV
 
-      - name: Build tuc (lite)
-        if: matrix.release_type == 'lite'
-        run: cargo build --release --locked --no-default-features
-
-      - name: Upload tuc (full) binary to release
-        if: matrix.release_type == 'full'
-        uses: svenstaro/upload-release-action@v2
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/tuc${{ matrix.ext }}
-          asset_name: tuc-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: true
+          toolchain: stable
+          target: ${{ matrix.rust-target }}
 
-      - name: Upload tuc (lite) binary to release
-        if: matrix.release_type == 'lite'
-        uses: svenstaro/upload-release-action@v2
+      - name: Setup musl for Linux
+        if: startsWith(matrix.os, 'ubuntu-')
+        run: sudo apt-get -y -qq install musl-tools
+
+      - name: Setup Xcode for macOS
+        if: startsWith(matrix.os, 'macos-')
+        run: sudo xcode-select -s '/Applications/Xcode_${{ env.xcode_version }}.app'
+
+      - name: Build
+        run: make
+
+      - name: Release
+        uses: ncipollo/release-action@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/tuc${{ matrix.ext }}
-          asset_name: tuc-lite-${{ matrix.partial_os }}-amd64${{ matrix.ext }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: true
-
-  macos_arm:
-    needs: check_if_safe
-    strategy:
-      matrix:
-        release_type: [full, lite]
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install ARM target
-        run: rustup update && rustup target add aarch64-apple-darwin
-
-      - name: Build ARM tuc (full)
-        if: matrix.release_type == 'full'
-        run: cargo build --release --target=aarch64-apple-darwin --locked
-
-      - name: Build ARM tuc (lite)
-        if: matrix.release_type == 'lite'
-        run: cargo build --release --target=aarch64-apple-darwin --locked --no-default-features
-
-      - name: Upload tuc (full) binary to release
-        if: matrix.release_type == 'full'
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/aarch64-apple-darwin/release/tuc
-          asset_name: tuc-macos-aarch64
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: true
-
-      - name: Upload tuc (lite) binary to release
-        if: matrix.release_type == 'lite'
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/aarch64-apple-darwin/release/tuc
-          asset_name: tuc-lite-macos-aarch64
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: true
+          artifacts: "*.tar.xz"
+          allowUpdates: true

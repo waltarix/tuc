@@ -351,7 +351,7 @@ where
     F: DelimiterFinder,
     R: DelimiterFinder,
 {
-    match (opt.read_to_end, opt.eol) {
+    match (opt.read_to_end.get(), opt.eol) {
         (false, EOL::Newline) => stdin.for_byte_line(|line| {
             cut_str(
                 line,

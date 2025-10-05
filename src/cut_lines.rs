@@ -88,10 +88,7 @@ fn cut_lines_forward_only<A: BufRead, B: Write>(
 }
 
 fn cut_lines<A: BufRead, B: Write>(stdin: &mut A, stdout: &mut B, opt: &Opt) -> Result<()> {
-    unsafe {
-        let mutable_ptr = opt as *const Opt as *mut Opt;
-        (*mutable_ptr).read_to_end = true;
-    }
+    opt.read_to_end.set(true);
 
     // Just use read_and_cut_str, we're cutting a (big) string whose delimiter is newline
     read_and_cut_str(stdin, stdout, opt)?;

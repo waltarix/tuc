@@ -4,7 +4,7 @@ use crate::{
 };
 use anyhow::Result;
 use bstr::ByteSlice;
-use std::{path::PathBuf, str::FromStr};
+use std::{cell::Cell, path::PathBuf, str::FromStr};
 
 #[cfg(feature = "regex")]
 use regex::bytes::Regex;
@@ -53,7 +53,7 @@ pub struct Opt {
     pub fallback_oob: Option<Vec<u8>>,
     pub path: Option<PathBuf>,
     pub use_mmap: bool,
-    pub read_to_end: bool,
+    pub read_to_end: Cell<bool>,
     pub unpack: bool,
     #[cfg(feature = "regex")]
     pub regex_bag: Option<RegexBag>,
@@ -82,7 +82,7 @@ impl Default for Opt {
             path: None,
             regex_bag: None,
             use_mmap: false,
-            read_to_end: false,
+            read_to_end: Cell::new(false),
             unpack: false,
         }
     }
@@ -408,7 +408,7 @@ impl TryFrom<args::Args> for Opt {
             path: value.path,
 
             // decided later at runtime
-            read_to_end: false,
+            read_to_end: Cell::new(false),
         })
     }
 }

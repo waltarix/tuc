@@ -104,7 +104,7 @@ fn output_parts<W: Write>(
     stdout: &mut W,
     opt: &FastOpt,
 ) -> Result<()> {
-    let r = b.try_into_range(fields.len() - 1);
+    let r = b.try_into_range(fields.len().saturating_sub(1));
 
     let output = if let Ok(r) = r {
         let idx_start = fields[r.start];

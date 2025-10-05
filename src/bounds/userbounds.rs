@@ -223,6 +223,10 @@ impl UserBoundsTrait for UserBounds {
     /// );
     /// ```
     fn try_into_range(&self, parts_length: usize) -> Result<Range<usize>> {
+        if parts_length == 0 {
+            bail!("Out of bounds: {}", self.l);
+        }
+
         let r_value = std::cmp::min(self.r.value_unchecked(), parts_length - 1);
 
         if self.l.value_unchecked() >= parts_length {
@@ -256,12 +260,16 @@ impl UserBoundsTrait for UserBounds {
     fn unpack(&self, num_fields: usize) -> Vec<UserBounds> {
         let mut bounds = Vec::new();
 
+        if num_fields == 0 {
+            return bounds;
+        }
+
         const RIGHT_MAX: usize = Side::max_right();
 
         let (start, end): (usize, usize) = match (self.l.value(), self.r.value()) {
             ((l_is_negative, l_value), (_, RIGHT_MAX)) => (
                 if l_is_negative {
-                    num_fields - l_value - 1
+                    num_fields.saturating_sub(l_value + 1)
                 } else {
                     l_value
                 },
@@ -269,12 +277,12 @@ impl UserBoundsTrait for UserBounds {
             ),
             ((l_is_negative, l_value), (r_is_negative, r_value)) => (
                 if l_is_negative {
-                    num_fields - l_value - 1
+                    num_fields.saturating_sub(l_value + 1)
                 } else {
                     l_value
                 },
                 if r_is_negative {
-                    num_fields - r_value - 1
+                    num_fields.saturating_sub(r_value + 1)
                 } else {
                     r_value
                 },
